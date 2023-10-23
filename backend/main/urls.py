@@ -6,8 +6,8 @@ from .views import ForumView, OpportunityView, SignUp, home, profile, clogout, w
 
 
 urlpatterns = [
-    path("", home, name="home"),
-    path("Waitlist/", waitlist, name="waitlist"),
+    # path("", home, name="home"),
+    path("", waitlist, name="waitlist"),
     # path('logout/', clogout, name='logout'),
     # path("signup/", SignUp.as_view(), name="signup"),
     # path("opportunity/", OpportunityView, name="opportunity"),

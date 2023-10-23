@@ -34,9 +34,12 @@ def home(request):
 def waitlist(request):
     if request.method == "POST":
         form = AddWaitlistForm(request.POST)
+        print('here')
         if form.is_valid():
+            print('alo')
             form.save()
-            return redirect("waitlist")
+            return redirect("")
+        print('there')
     else:
         form = AddWaitlistForm()
     return render(request, "waitlist/landing_page.html", {"form":form})

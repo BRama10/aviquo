@@ -3,22 +3,63 @@ Django settings for the aviquo project.
 """
 
 import os
+import environ 
+
 from pathlib import Path
+from urllib.parse import urlparse
+
+import io
+from google.cloud import secretmanager
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    "AVIQUO_SECRET_KEY",
-    "django-insecure-+%s$-n=0kotg$tt#e$wrk=um#68gxa8(0^joabpuml9xm*q@sp",
+env = environ.Env(
+    DEBUG=(bool, False)
 )
 
-# SECURITY: don't run with debugging on in production!
-# DEBUG is False only when in the OS environment DEBUG='' or DEBUG is unset
-DEBUG = os.environ.get("AVIQUO_DEBUG", True)
+env_file = os.path.join(BASE_DIR, '.env')
+if os.path.isfile(env_file):
+    # read a local .env file
+    env.read_env(env_file)
+elif os.environ.get('GOOGLE_CLOUD_PROJECT', None):
+    # pull .env file from Secret Manager
+    project_id = os.environ.get('GOOGLE_CLOUD_PROJECT')
 
-ALLOWED_HOSTS = ["*"]
+    client = secretmanager.SecretManagerServiceClient()
+    settings_name = os.environ.get('SETTINGS_NAME', 'django-settings-alpha')
+    name = f'projects/{project_id}/secrets/{settings_name}/versions/latest'
+    payload = client.access_secret_version(name=name).payload.data.decode('UTF-8')
+
+    env.read_env(io.StringIO(payload))
+else:
+    raise Exception('No local .env or GOOGLE_CLOUD_PROJECT detected. No secrets found.')
+
+# # SECURITY: keep the secret key used in production secret!
+# SECRET_KEY = os.environ.get(
+#     "AVIQUO_SECRET_KEY",
+#     "django-insecure-+%s$-n=0kotg$tt#e$wrk=um#68gxa8(0^joabpuml9xm*q@sp",
+# )
+
+# # SECURITY: don't run with debugging on in production!
+# # DEBUG is False only when in the OS environment DEBUG='' or DEBUG is unset
+# DEBUG = os.environ.get("AVIQUO_DEBUG", True)
+
+SECRET_KEY = env('SECRET_KEY')
+
+DEBUG = env('DEBUG')
+
+APPENGINE_URL = env('APPENGINE_URL', default=None)
+if APPENGINE_URL:
+    # ensure a scheme is present in the URL before it's processed.
+    if not urlparse(APPENGINE_URL).scheme:
+        APPENGINE_URL = f'https://{APPENGINE_URL}'
+
+    ALLOWED_HOSTS = [urlparse(APPENGINE_URL).netloc]
+    CSRF_TRUSTED_ORIGINS = [APPENGINE_URL]
+    SECURE_SSL_REDIRECT = True
+else:
+    ALLOWED_HOSTS = ['*']
 
 # Application definition
 INSTALLED_APPS = [
@@ -69,7 +110,9 @@ TEMPLATES = [
     },
 ]
 
-ASGI_APPLICATION = "core.asgi.application"
+# ASGI_APPLICATION = "core.asgi.application"
+WSGI_APPLICATION = "core.wsgi.application"
+
 AUTH_USER_MODEL = "main.User"
 
 # Database
@@ -92,11 +135,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-REST_FRAMEWORK = {
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework_api_key.permissions.HasAPIKey",
-    ]
-}
+# REST_FRAMEWORK = {
+#     "DEFAULT_PERMISSION_CLASSES": [
+#         "rest_framework_api_key.permissions.HasAPIKey",
+#     ]
+# }
 
 
 # Internationalization
@@ -121,6 +164,6 @@ STATIC_ROOT = BASE_DIR / "static"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ORIGIN_WHITELIST = ["http://localhost:3000"]
-API_KEY_CUSTOM_HEADER = "HTTP_X_API_KEY"
+# CORS_ORIGIN_WHITELIST = ["http://localhost:3000"]
+# API_KEY_CUSTOM_HEADER = "HTTP_X_API_KEY"
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
